@@ -50,6 +50,10 @@ fun AppNavigation(
                     navController.navigate(Routes.RESULT) {
                         popUpTo(Routes.QUIZ) { inclusive = true }
                     }
+                },
+                onExit = {
+                    viewModel.resetSession()
+                    navController.popBackStack()
                 }
             )
         }

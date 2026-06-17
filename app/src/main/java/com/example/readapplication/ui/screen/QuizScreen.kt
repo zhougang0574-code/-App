@@ -2,6 +2,7 @@ package com.example.readapplication.ui.screen
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -34,7 +35,8 @@ import com.example.readapplication.viewmodel.QuizUiState
 fun QuizScreen(
     uiState: QuizUiState,
     onEvent: (QuizEvent) -> Unit,
-    onFinished: () -> Unit
+    onFinished: () -> Unit,
+    onExit: () -> Unit
 ) {
     val context = LocalContext.current
     var hasAudioPermission by remember {
@@ -46,6 +48,7 @@ fun QuizScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> hasAudioPermission = granted }
+    var showExitConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (!hasAudioPermission) permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -53,6 +56,26 @@ fun QuizScreen(
 
     LaunchedEffect(uiState.phase) {
         if (uiState.phase == QuizPhase.FINISHED) onFinished()
+    }
+
+    // 拦截系统返回键：先停止音频/录音，弹出确认框，避免静默丢失进度
+    BackHandler { showExitConfirm = true }
+
+    if (showExitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            title = { Text("退出本轮练习？") },
+            text = { Text("当前答题进度将不会保存") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitConfirm = false
+                    onExit()
+                }) { Text("退出") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirm = false }) { Text("继续答题") }
+            }
+        )
     }
 
     val bgColor by animateColorAsState(
@@ -77,7 +100,8 @@ fun QuizScreen(
             QuizTopBar(
                 current = uiState.questionNumber,
                 total = uiState.totalQuestions,
-                correct = uiState.correctCount
+                correct = uiState.correctCount,
+                onExitClick = { showExitConfirm = true }
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -151,12 +175,15 @@ fun QuizScreen(
 }
 
 @Composable
-private fun QuizTopBar(current: Int, total: Int, correct: Int) {
+private fun QuizTopBar(current: Int, total: Int, correct: Int, onExitClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        IconButton(onClick = onExitClick) {
+            Text("✕", style = MaterialTheme.typography.titleLarge, color = DeepNavy)
+        }
         Text(
             text = "第 $current / $total 题",
             style = MaterialTheme.typography.titleLarge,
